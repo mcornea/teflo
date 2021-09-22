@@ -304,6 +304,18 @@ class ScenarioGraph():
                 if task not in self.get_failed_tasks():
                     self._failed_tasks.append(task)
 
+    def remove_resources_from_scenario(self, sc: Scenario):
+        for asset in sc.get_assets():
+            self._assets.remove(asset)
+        for execute in sc.get_executes():
+            self._executes.remove(execute)
+        for action in sc.get_actions():
+            self._actions.remove(action)
+        for notification in sc.get_notifications():
+            self._notifications.remove(notification)
+        for report in sc.get_reports():
+            self._reports.remove(report)
+
     def reload_resources_from_scenario(self, scenario: Scenario):
         self.add_tasks(scenario)
         for action in scenario.get_actions():

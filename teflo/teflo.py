@@ -479,6 +479,7 @@ class Teflo(LoggerMixin, TimeMixin):
         status = 0
         if not self.teflo_options.get('no_notify', False):
             self.notify('on_start', status, passed_tasks, failed_tasks, scenario=sc)
+
         try:
             for task in sort_tasklist(tasklist):
                 self.logger.info(' * Task    : %s' % task)
@@ -488,11 +489,13 @@ class Teflo(LoggerMixin, TimeMixin):
                 # TODO: MAKE THIS ONE TIME RUN
 
                 data = self._run_pipeline(task, sc)
+                self.scenario_graph.remove_resources_from_scenario(sc)
 
                 # reload resource objects
                 sc: Scenario
                 # for sc in self.scenario_graph:
                 sc.reload_resources(data)
+                self.scenario_graph.reload_resources_from_scenario(sc)
                 # Creating inventory only when task is provision
                 if task == 'provision':
                     all_hosts = sc.get_assets()
@@ -520,8 +523,10 @@ class Teflo(LoggerMixin, TimeMixin):
 
             self.logger.error(ex)
 
+            self.scenario_graph.remove_resources_from_scenario(sc)
             # reload resource objects
             sc.reload_resources(ex.results)
+            self.scenario_graph.reload_resources_from_scenario(sc)
 
             # roll back by cleaning up any resources that might have been provisioned
             if "cleanup" in tasklist and [item for item in failed_tasks if item != 'cleanup']:
@@ -534,6 +539,7 @@ class Teflo(LoggerMixin, TimeMixin):
                     try:
 
                         data = self._run_pipeline("cleanup", sc)
+                        self.scenario_graph.remove_resources_from_scenario(sc)
 
                         # reload resource objects
                         sc.reload_resources(data)
@@ -579,6 +585,7 @@ class Teflo(LoggerMixin, TimeMixin):
                     setattr(sc, 'failed_tasks', failed_tasks)
                 try:
                     data = self._run_pipeline(task, sc)
+                    self.scenario_graph.remove_resources_from_scenario(sc)
                     sc.reload_resources(data)
                     self.scenario_graph.reload_resources_from_scenario(sc)
                 except Exception as ex:
@@ -586,6 +593,7 @@ class Teflo(LoggerMixin, TimeMixin):
                     self.logger.error(ex)
                     self.logger.error(termcolor.colored(
                         'One or more notifications failed. Refer to the scenario.log', "red"))
+                    self.scenario_graph.remove_resources_from_scenario(sc)
                     sc.reload_resources(ex.results)
                     self.scenario_graph.reload_resources_from_scenario(sc)
                     # save end time
@@ -614,12 +622,14 @@ class Teflo(LoggerMixin, TimeMixin):
             # blast off the pipeline list of tasks
             try:
                 data = self._run_pipeline(task, scenario)
+                self.scenario_graph.remove_resources_from_scenario(scenario)
                 scenario.reload_resources(data)
                 self.scenario_graph.reload_resources_from_scenario(scenario)
             except Exception as ex:
                 status = 1
                 self.logger.error(ex)
                 self.logger.error('One or more notifications failed. Refer to the scenario.log')
+                self.scenario_graph.remove_resources_from_scenario(sc)
                 scenario.reload_resources(ex.results)
                 self.scenario_graph.reload_resources_from_scenario(scenario)
 
