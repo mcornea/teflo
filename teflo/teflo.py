@@ -29,6 +29,7 @@ from logging import root
 import os
 from re import L
 import sys
+from teflo.exceptions import TefloScenarioFailure
 import blaster
 import termcolor
 from contextlib import ExitStack
@@ -375,7 +376,12 @@ class Teflo(LoggerMixin, TimeMixin):
 
             sc: Scenario
             for sc in self.scenario_graph:
-                self.run_helper(sc=sc, tasklist=tasklist_run)
+                try:
+                    self.run_helper(sc=sc, tasklist=tasklist_run)
+                except TefloScenarioFailure as ex:
+                    self.scenario_graph.reinit()
+                    self.logger.error(ex)
+                    break
             self.collect_final_passed_failed_tasks_status(final_passed_tasks, final_failed_tasks, status)
 
     def run(self, tasklist: list = TASKLIST):
@@ -435,11 +441,16 @@ class Teflo(LoggerMixin, TimeMixin):
         cleanup_sc.reverse()
         sc: Scenario
         for sc in cleanup_sc:
-            self.logger.info("." * 50)
-            self.logger.info(termcolor.colored('\'%s\' is running from the scenario file: %s' %
-                                               (sc.name, sc.path), "green"))
-            self.logger.info("." * 50)
-            self.run_helper(sc=sc, tasklist=["cleanup"])
+            try:
+                self.logger.info("." * 50)
+                self.logger.info(termcolor.colored('\'%s\' is running from the scenario file: %s' %
+                                                   (sc.name, sc.path), "green"))
+                self.logger.info("." * 50)
+                self.run_helper(sc=sc, tasklist=["cleanup"])
+            except TefloScenarioFailure as ex:
+                self.scenario_graph.reinit()
+                self.logger.error(ex)
+                break
 
         self.collect_final_passed_failed_tasks_status(final_passed_tasks, final_failed_tasks, status)
 
@@ -537,7 +548,6 @@ class Teflo(LoggerMixin, TimeMixin):
                                         "Attempting to run the cleanup task to roll back all provisioned resources.")
 
                     try:
-
                         data = self._run_pipeline("cleanup", sc)
                         self.scenario_graph.remove_resources_from_scenario(sc)
 
@@ -550,7 +560,7 @@ class Teflo(LoggerMixin, TimeMixin):
                         self.logger.error("There was a problem running the cleanup task to roll back the "
                                           "resources. You may need to manually cleanup any provisioned resources")
                         failed_tasks.append(task)
-                        raise
+                        raise TefloScenarioFailure("`%s` failed during running cleanup rollback" % sc.name)
         finally:
             setattr(sc, 'overall_status', status)
             setattr(sc, 'passed_tasks', passed_tasks)
@@ -558,6 +568,16 @@ class Teflo(LoggerMixin, TimeMixin):
             self.scenario_graph.reload_resources_from_scenario(sc)
             if not self.teflo_options.get('no_notify', False):
                 self.notify('on_complete', status, passed_tasks, failed_tasks, sc)
+            # TODO: Scenario Graph related
+            # We should let customer decide wtheather they want to fail the whole graph
+            # right after anyone of the scenario failed
+
+            def exit_on_status():
+
+                state = 'FAILED' if status else 'PASSED'
+                if state is 'FAILED':
+                    raise TefloScenarioFailure("`%s` failed during running" % sc.name)
+            exit_on_status()
 
     def notify(self, task, status=0, passed_tasks=None, failed_tasks=None, scenario: Scenario = None):
         """
@@ -629,7 +649,7 @@ class Teflo(LoggerMixin, TimeMixin):
                 status = 1
                 self.logger.error(ex)
                 self.logger.error('One or more notifications failed. Refer to the scenario.log')
-                self.scenario_graph.remove_resources_from_scenario(sc)
+                self.scenario_graph.remove_resources_from_scenario(scenario)
                 scenario.reload_resources(ex.results)
                 self.scenario_graph.reload_resources_from_scenario(scenario)
 

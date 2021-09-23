@@ -200,10 +200,7 @@ class ScenarioGraph():
                     return self.current
                 self.prev = self.current
 
-            self.__init__(self.root, self.iterate_method, assets=self.get_assets(), executes=self.get_executes(
-            ), notifications=self.get_notifications(), reports=self.get_reports(), actions=self.get_actions(),
-                failed_tasks=self.get_failed_tasks(),
-                passed_tasks=self.get_passed_tasks())
+            self.reinit()
             raise StopIteration
 
         elif self.iterate_method == "by_level":
@@ -241,10 +238,7 @@ class ScenarioGraph():
 
                 self.prev = self.current
 
-            self.__init__(self.root, self.iterate_method, assets=self.get_assets(), executes=self.get_executes(
-            ), notifications=self.get_notifications(), reports=self.get_reports(), actions=self.get_actions(),
-                failed_tasks=self.get_failed_tasks(),
-                passed_tasks=self.get_passed_tasks())
+            self.reinit()
             raise StopIteration
 
     def __str__(self):
@@ -340,3 +334,9 @@ class ScenarioGraph():
         all_resources.extend([item for item in self.get_reports()])
         all_resources.extend([item for item in self.get_notifications()])
         return all_resources
+
+    def reinit(self):
+        self.__init__(self.root, self.iterate_method, assets=self.get_assets(), executes=self.get_executes(
+        ), notifications=self.get_notifications(), reports=self.get_reports(), actions=self.get_actions(),
+                failed_tasks=self.get_failed_tasks(),
+                passed_tasks=self.get_passed_tasks())
