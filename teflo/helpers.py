@@ -1316,7 +1316,7 @@ def build_artifact_regex_query(name):
     return regquery
 
 
-def check_for_var_file(config):
+def check_for_var_file(config, temp_data_raw=()):
     """ This method  is for checking if variable file/directory is provided by the user in teflo.cfg under var_file key,
      var_file.yml under the workspace , vars folder in the workspace and
      It looks for yaml/yml files and then returns a list of file paths
@@ -1330,6 +1330,8 @@ def check_for_var_file(config):
 
     :param config: config object for teflo
     :type config: config obj
+    :param temp_data_raw: cli tuple input
+    :type temp_data_raw: tuple
     :return: var_file_list
     :rtype: list of variable file paths
     """
@@ -1359,7 +1361,6 @@ def check_for_var_file(config):
         if os.path.isdir(default_var_file):
             LOG.debug("Default variable file path in teflo.cfg is a directory. "
                       "Looking for .yml files to be used as variable files")
-
             for subdir, dirs, files in os.walk(default_var_file):
                 for filename in files:
                     filepath = subdir + os.sep + filename
@@ -1369,6 +1370,25 @@ def check_for_var_file(config):
             LOG.debug("Default variable file found in teflo.cfg")
             var_file_list.append(default_var_file)
 
+    # CHECK IF VAR_DATA WAS GIVEN BY USER IS FILE OR DIR
+    if temp_data_raw:
+        for item in temp_data_raw:
+            if item.endswith(".yml"):
+                var_file_list.append(item)
+            elif temp_data_raw and os.path.exists(item):
+                if os.path.isdir(item):
+                    LOG.debug("User variable file path given by CLI is a directory. "
+                              "Looking for .yml files to be used as variable files")
+                    for subdir, dirs, files in os.walk(item):
+                        for filename in files:
+                            filepath = subdir + os.sep + filename
+                            if filepath.endswith(".yml"):
+                                var_file_list.append(filepath)
+            try:
+                temp_json = json.dumps(json.loads(item.replace("'", '"')))
+                var_file_list.append(temp_json)
+            except Exception:
+                continue
     return var_file_list
 
 
@@ -1537,9 +1557,7 @@ def validate_render_scenario(scenario_path, config, temp_data_raw=()):
     """
 
     # Click gives us a tuple, by default
-    var_file_list = check_for_var_file(config)
-    if isinstance(temp_data_raw, tuple):
-        var_file_list.extend(list(temp_data_raw))
+    var_file_list = check_for_var_file(config, temp_data_raw)
     # Convert each item to an object, then reduce them all back to one
     temp_data_objs = [file_mgmt("r", t) if os.path.isfile(t)
                                   else json.loads(t) for t in var_file_list]

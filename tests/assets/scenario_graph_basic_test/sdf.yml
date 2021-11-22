@@ -1,0 +1,10 @@
+---
+
+name: sdf
+description: "Included scenario for py3 environment using linchpin"
+provision:
+  - name: {{ firstkey | default('test') }}
+    provisioner: openstack
+
+  - name: {{ secondkey | default('test') }}
+    provisioner: openstack
